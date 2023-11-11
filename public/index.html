@@ -61,7 +61,7 @@
      <button type="button" class="btn btn-default" style="visibility: hidden;"  onclick="runTaskSimulation();">Simulate</button>
      <button type="button" class="btn btn-success" data-toggle="modal" data-target="#jobSummaryModal"><span class="glyphicon glyphicon-play"></span> Start</button>
     </div>
-    <button id="nav_stop" type="button" class="btn btn-danger" onclick="abortTask()" style="display:none" ><span class="glyphicon glyphicon-stop"></span> Stop</button>
+     <button type="button" class="btn btn-success" data-toggle="modal" data-target="#jobSummaryModal"><span class="glyphicon glyphicon-play"></span>STOP</button>
    </div>
     <div id="edit" style="display:none;">
      <div class="input-group">
@@ -85,6 +85,8 @@
      </div>
     </div>
    </div>
+   <p align="center"><a href="http://melttech.com.au/Install.html" target="_blank"><img src="help_button.PNG" alt="MeltTech Install" width="100" height="20"></a><a href="http://melttech.com.au/Install.html" target="_blank"><img src="Firing Profiles.PNG" alt="Kiln Firing Profiles" width="100" height="20"></a><a href="https://www.youtube.com/results?search_query=ceramics+kiln+firing" target="_blank"><img src="ceramics.PNG" alt="Ceramics" width="100" height="20"></a><a href="https://www.youtube.com/results?search_query=Glass+kiln+firing" target="_blank"><img src="Glass.PNG" width="100" height="20"></a><a href="https://www.youtube.com/results?search_query=Heat+Treatment" target="_blank"><img src="Heat Treatment.PNG" alt="Heat Treatment" width="100" height="20"></a><a href="https://www.youtube.com/results?search_query=jewelry+casting" target="_blank"><img src="Jewelery.PNG" alt="Jewelery" width="100" height="20"></a><a href="https://www.youtube.com/results?search_query=precious+metal+clay" target="_blank"><img src="PMC.PNG" alt="PMC" width="100" height="20"></a></p>
+
    <div class="panel-body">
     <div id="graph_container" class="graph"></div>
    </div>
@@ -109,8 +111,11 @@
     <div class="modal-footer">
      <div class="btn-group" style="width: 100%">
       <button type="button" class="btn btn-danger" style="width: 50%" data-dismiss="modal">No, take me back</button>
-      <button type="button" class="btn btn-success" style="width: 50%" data-dismiss="modal" onclick="runTask()">Yes, start the Run</button>
-     </div>
+      <button type="button" class="btn btn-success" style="width: 50%" data-dismiss="modal" onClick="runTask()">Start new Run</button>
+      <button type="button" class="btn btn-danger" style="width: 50%" data-dismiss="modal" onClick="abortTask()">Emergeny Stop</button>
+      <button type="button" class="btn btn-success" style="width: 50%" data-dismiss="modal" onClick="runTaskResume()">Resume Run N/A</button>
+      <button type="button" class="btn btn-danger" style="width: 50%" data-dismiss="modal" onClick="abortTask()">Emergeny Stop</button>
+      <button type="button" class="btn btn-success" style="width: 50%" data-dismiss="modal" onClick="runTuning()">Bung Control N/A</button>     </div>
     </div>
    </div>
   </div>
