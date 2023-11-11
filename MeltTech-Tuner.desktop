@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Melttech2 Tuner
+Comment=Kiln Tuner BP 2022
+Icon=/home/pi/kiln-controller/public/assets/images/melttech.xpm
+Exec=/usr/bin/python /home/pi/kiln-controller/kiln-tuner.py recordprofile zn.csv --targettemp 500
+Type=Application
+Encoding=UTF-8
+Terminal=true
+Categories=None;
