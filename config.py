@@ -13,7 +13,7 @@ log_level = logging.INFO
 log_format = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 
 ### Server
-listening_port = 8081
+listening_port = 8082
 
 ########################################################################
 # Cost Information
@@ -22,8 +22,8 @@ listening_port = 8081
 # to produce the actual cost during a run. My kiln has three
 # elements that when my switches are set to high, consume 9460 watts.
 
-kwh_rate        = 0.1319  # cost per kilowatt hour per currency_type to calculate cost to run job
-kw_elements     = 9.460 # if the kiln elements are on, the wattage in kilowatts
+kwh_rate        = 0.2519  # cost per kilowatt hour per currency_type to calculate cost to run job
+kw_elements     = 4.800 # if the kiln elements are on, the wattage in kilowatts
 currency_type   = "$"   # Currency Symbol to show when calculating cost to run job
 
 ########################################################################
@@ -36,7 +36,7 @@ currency_type   = "$"   # Currency Symbol to show when calculating cost to run j
 #   can use whichever GPIO you prefer/have available.
 
 ### Outputs
-gpio_heat = 23  # Switches zero-cross solid-state-relay
+gpio_heat = 20  # Switches zero-cross solid-state-relay
 
 ### Thermocouple Adapter selection:
 #   max31855 - bitbang SPI interface
@@ -48,9 +48,9 @@ max31856 = 0
 #thermocouple_type = MAX31856.MAX31856_S_TYPE
 
 ### Thermocouple Connection (using bitbang interfaces)
-gpio_sensor_cs = 27
-gpio_sensor_clock = 22
-gpio_sensor_data = 17
+gpio_sensor_cs = 8
+gpio_sensor_clock = 11
+gpio_sensor_data = 9
 gpio_sensor_di = 10 # only used with max31856
 
 ########################################################################
@@ -60,7 +60,7 @@ gpio_sensor_di = 10 # only used with max31856
 # Every N seconds a decision is made about switching the relay[s] 
 # on & off and for how long. The thermocouple is read 
 # temperature_average_samples times during and the average value is used.
-sensor_time_wait = 2
+sensor_time_wait = 14
 
 
 ########################################################################
@@ -87,7 +87,7 @@ stop_integral_windup = True
 ########################################################################
 #
 #   Simulation parameters
-simulate = True
+simulate = False
 sim_t_env      = 60.0   # deg C
 sim_c_heat     = 500.0  # J/K  heat capacity of heat element
 sim_c_oven     = 5000.0 # J/K  heat capacity of oven
@@ -105,8 +105,8 @@ sim_R_ho_air   = 0.05   # K/W  " with internal air circulation
 # If you change the temp_scale, all settings in this file are assumed to
 # be in that scale.
 
-temp_scale          = "f" # c = Celsius | f = Fahrenheit - Unit to display
-time_scale_slope    = "h" # s = Seconds | m = Minutes | h = Hours - Slope displayed in temp_scale per time_scale_slope
+temp_scale          = "c" # c = Celsius | f = Fahrenheit - Unit to display
+time_scale_slope    = "m" # s = Seconds | m = Minutes | h = Hours - Slope displayed in temp_scale per time_scale_slope
 time_scale_profile  = "m" # s = Seconds | m = Minutes | h = Hours - Enter and view target time in time_scale_profile
 
 # emergency shutoff the profile if this temp is reached or exceeded.
@@ -114,12 +114,12 @@ time_scale_profile  = "m" # s = Seconds | m = Minutes | h = Hours - Enter and vi
 # naturally cool off. If your SSR has failed/shorted/closed circuit, this
 # means your kiln receives full power until your house burns down.
 # this should not replace you watching your kiln or use of a kiln-sitter
-emergency_shutoff_temp = 2264 #cone 7
+emergency_shutoff_temp = 1288 #cone 10
 
 # If the current temperature is outside the pid control window,
 # delay the schedule until it does back inside. This allows for heating
 # and cooling as fast as possible and not continuing until temp is reached.
-kiln_must_catch_up = True
+kiln_must_catch_up = False
 
 # This setting is required. 
 # This setting defines the window within which PID control occurs.
