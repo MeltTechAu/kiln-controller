@@ -112,6 +112,8 @@ class TempSensorSimulated(TempSensor):
     def __init__(self):
         TempSensor.__init__(self)
 
+import pygame  # Import the pygame library
+
 class TempSensorReal(TempSensor):
     '''real temperature sensor thread that takes N measurements
        during the time_step'''
@@ -142,6 +144,11 @@ class TempSensorReal(TempSensor):
                                          units = config.temp_scale,
                                          ac_freq_50hz = config.ac_freq_50hz,
                                          )
+
+        # Initialize pygame for sound
+        pygame.mixer.init()
+        self.no_connection_sound = pygame.mixer.Sound("no_connection.wav")  # Replace with your sound file
+
 
     def run(self):
         '''use a moving average of config.temperature_average_samples across the time_step'''
@@ -177,6 +184,9 @@ class TempSensorReal(TempSensor):
                 log.error("Problem reading temp N/C:%s GND:%s VCC:%s ???:%s" % (self.noConnection,self.shortToGround,self.shortToVCC,self.unknownError))
                 self.bad_count += 1
 
+                # Play a sound notification for "no connection" error
+                self.no_connection_sound.play()
+
             if len(temps):
                 self.temperature = self.get_avg_temp(temps)
             time.sleep(self.sleeptime)
@@ -192,6 +202,58 @@ class TempSensorReal(TempSensor):
         items = int(total*chop)
         temps = temps[items:total-items]
         return sum(temps) / len(temps)
+class ConeModeController:
+    def __init__(self, oven_watcher):
+        self.oven_watcher = oven_watcher
+        self.cone_mode_activated = False
+        self.cone_target_temp = None
+        self.cone_drop_rate = 3  # 3% of the max temperature in °C
+        self.cone_max_temp = None
+        self.cone_start_time = None
+        self.cone_heat_work_done = False
+
+    def activate_cone_mode(self, cone_type):
+        if not self.cone_mode_activated:
+            self.cone_target_temp = self.get_target_temperature_for_cone(cone_type)
+            self.cone_max_temp = self.oven_watcher.oven.get_max_temperature()
+            self.cone_mode_activated = True
+            self.cone_start_time = time.time()
+            self.cone_heat_work_done = False
+            self.oven_watcher.oven.set_target_temperature(self.cone_target_temp)
+
+    def deactivate_cone_mode(self):
+        if self.cone_mode_activated:
+            self.oven_watcher.oven.set_target_temperature(0)  # Turn off the kiln
+            self.cone_mode_activated = False
+            self.cone_target_temp = None
+            self.cone_max_temp = None
+            self.cone_start_time = None
+            self.cone_heat_work_done = False
+
+    def get_target_temperature_for_cone(self, cone_type):
+        # Define a mapping from cone types to target temperatures in °C
+        cone_temperature_mapping = {
+            "Cone 06": 1010,
+            "Cone 5": 1204,  # Adjust values as needed
+            # Add more cone types and temperatures as required
+        }
+        return cone_temperature_mapping.get(cone_type, 0)
+
+    def update_cone_mode(self):
+        if self.cone_mode_activated:
+            current_temp = self.oven_watcher.oven.get_current_temperature()
+
+            if current_temp >= self.cone_max_temp:
+                # Kiln has reached or exceeded the maximum temperature
+                self.cone_heat_work_done = True
+                self.oven_watcher.oven.set_target_temperature(current_temp)
+            elif not self.cone_heat_work_done:
+                # Continue heating at the maximum temperature until heat work is done
+                self.oven_watcher.oven.set_target_temperature(self.cone_max_temp)
+            else:
+                # Gradually reduce temperature by the drop rate
+                new_target_temp = max(current_temp - (self.cone_drop_rate), 0)
+                self.oven_watcher.oven.set_target_temperature(new_target_temp)
 
 class Oven(threading.Thread):
     '''parent oven class. this has all the common code
