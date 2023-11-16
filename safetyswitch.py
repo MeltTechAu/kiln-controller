@@ -4,11 +4,14 @@ import digitalio
 import logging
 
 log = logging.getLogger(__name__)
-### seems to work on different OS's??? complains of pin error unccommnet in oven.py file to test also to work have you main oven controll gpio set to safety switch and give you heat output a new gpio seems to work backwards hmmmmmmm???? anyone
+
 
 class SafetySwitch:
     def __init__(self, pin: Pin, active_value: bool = True) -> None:
         if pin is None:
+            log.warn("====================================================")
+            log.warn("Running without safety switch. This is DANGEROUS!!!!")
+            log.warn("====================================================")
             self._pin = None
             return
         self._active_value = active_value

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Melttech2
+Comment=Kiln Controller BP 2022
+Icon=/home/pi/kiln-controller/public/assets/images/melttech.xpm
+Exec=/usr/bin/python /home/pi/kiln-controller/kiln-controller.py
+Type=Application
+Encoding=UTF-8
+Terminal=true
+Categories=None;

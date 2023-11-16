@@ -45,6 +45,16 @@ ovenWatcher = OvenWatcher(oven)
 # this ovenwatcher is used in the oven class for restarts
 oven.set_ovenwatcher(ovenWatcher)
 
+@app.route('/api/cone-mode', method='POST')
+def set_cone_mode():
+    data = bottle.request.json
+    if data['activate']:
+        ovenWatcher.activate_cone_mode()
+    else:
+        ovenWatcher.deactivate_cone_mode()
+    return {"success": True}
+
+
 @app.route('/')
 def index():
     return bottle.redirect('/picoreflow/index.html')
