@@ -23,7 +23,7 @@ Turns a Raspberry Pi into an Awesome, web-enabled kiln controller.
   2023 updates
   * added Touch Fuction Edit/Stage Points MT
   * added Talking kiln controller No connection for replacement of damaged part Audio notification with real voice MT
-  
+  Added numerical order of profiles MT
   future
   Working on Cone Mode implementation
 **Run Kiln Schedule**
