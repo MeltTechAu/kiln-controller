@@ -75,14 +75,40 @@ class ConeModeController:
     def get_target_temperature_for_cone(self, cone_type):
         # Define a mapping from cone types to target temperatures in °C
         cone_temperature_mapping = {
-            "Cone 10": 1300,
-            "Cone 9": 1288,  # Adjust values as needed
-            "Cone 8": 1260,
-            "Cone 7": 1111,  # Adjust values as needed
-            "Cone 6": 1122,
-            "Cone 5": 1123,  # Adjust values as needed
-            "Cone 4": 1101,
-            "Cone 3": 1011,  # Adjust values as needed
+            "Cone 12": 1306,  # Adjust values as needed
+            "Cone 11": 1294,  # Adjust values as needed
+            "Cone 10": 1288,
+            "Cone 9": 1260,  # Adjust values as needed
+            "Cone 8": 1249,
+            "Cone 7": 1239,  # Adjust values as needed
+            "Cone 6": 1222,
+            "Cone 5": 1186,  # Adjust values as needed
+            "Cone 4": 1162,
+            "Cone 3": 1152,  # Adjust values as needed
+            "Cone 2": 1142,  # Adjust values as needed
+            "Cone 1": 1137,
+            "Cone 01": 1119,  # Adjust values as needed
+            "Cone 02": 1102,
+            "Cone 03": 1086,  # Adjust values as needed
+            "Cone 04": 1063,
+            "Cone 05": 1031,  # Adjust values as needed
+            "Cone 06": 998,
+            "Cone 07": 976,  # Adjust values as needed
+            "Cone 08": 942,
+            "Cone 09": 920,  # Adjust values as needed
+            "Cone 010": 903,  # Adjust values as needed
+            "Cone 011": 875,
+            "Cone 012": 861,  # Adjust values as needed
+            "Cone 013": 837,  # Adjust values as needed
+            "Cone 014": 807,
+            "Cone 015": 791,  # Adjust values as needed
+            "Cone 016": 772,
+            "Cone 017": 738,  # Adjust values as needed
+            "Cone 018": 715,
+            "Cone 019": 678,  # Adjust values as needed
+            "Cone 020": 626,  # Adjust values as needed
+            "Cone 021": 600,
+            "Cone 022": 586,  # Adjust values as needed
             # Add more cone types and temperatures as required
         }
         return cone_temperature_mapping.get(cone_type, 0)
