@@ -12,7 +12,33 @@ log = logging.getLogger(__name__)
 # Updated ConeModeController class
 import time
 
-class ConeModeController:
+import logging
+
+class ConeModeController:        
+    def calculate_lost_heatwork(self, current_temp, target_temp, elapsed_time):
+        # Simple model: Heatwork = Temperature * Time
+        # Calculate the expected heatwork at target temperature
+        expected_heatwork = target_temp * elapsed_time
+        # Calculate the actual heatwork at current temperature
+        actual_heatwork = current_temp * elapsed_time
+        # The lost heatwork is the difference
+        return expected_heatwork - actual_heatwork
+
+        # This function should return the heatwork lost due to temperature lag
+        return target_temp - current_temp  # Simplified example
+        
+    def calculate_additional_time(self, lost_heatwork, target_temp):
+        # Simple model: Additional Time = Lost Heatwork / Target Temperature
+        # Calculate the additional time required to achieve the lost heatwork at target temperature
+        if target_temp > 0:
+            return lost_heatwork / target_temp
+        else:
+            return 0  # Avoid division by zero
+
+        # This function should return additional time in seconds
+        return lost_heatwork * 10  # Simplified example
+
+    
     def __init__(self, oven):
         self.oven = oven
         self.cone_mode_activated = False
@@ -43,7 +69,33 @@ class ConeModeController:
             self.cone_heat_work_done = False
             self.cone_duration = 0  # Reset the duration
 
+    
     def update_cone_mode(self):
+        if self.cone_mode_activated:
+            current_temp = self.oven.get_current_temperature()
+            target_temp = self.cone_target_temp
+            elapsed_time = time.time() - self.cone_start_time
+            lost_heatwork = self.calculate_lost_heatwork(current_temp, target_temp, elapsed_time)
+            additional_time = self.calculate_additional_time(lost_heatwork, target_temp)
+
+            # Log the additional time calculation
+            logging.info(f"Additional time calculated for lost heatwork: {additional_time} seconds")
+
+            # Existing logic to update the cone mode
+            # ...
+
+            if self.cone_mode_activated:
+                current_temp = self.oven.get_current_temperature()
+                target_temp = self.cone_target_temp
+                lost_heatwork = self.calculate_lost_heatwork(current_temp, target_temp)
+                additional_time = self.calculate_additional_time(lost_heatwork)
+
+                # Log the additional time calculation
+                logging.info(f"Additional time calculated for lost heatwork: {additional_time} seconds")
+
+                # Existing logic to update the cone mode
+                # ...
+        
         if self.cone_mode_activated:
             current_temp = self.oven.get_current_temperature()
 
@@ -123,16 +175,13 @@ class OvenWatcher(threading.Thread):
         threading.Thread.__init__(self)
         self.daemon = True
         self.oven = oven
-        self.start()
-        self.oven = oven
         self.cone_mode = False
         self.cone_mode_controller = ConeModeController(oven)
         self.cone_mode_controller.deactivate_cone_mode()  # Ensure Cone Mode is initially deactivated
-       # Flask app for integrating with frontend
+  #     Flask app for integrating with frontend
         self.flask_app = Flask(__name__)
-        self.cone_mode_controller = ConeModeController(oven)
-        self.cone_mode_controller.deactivate_cone_mode()  # Ensure Cone Mode is initially deactivated
-        # Flask endpoint to receive cone mode activation from frontend
+        self.start()
+  # Flask endpoint to receive cone mode activation from frontend
         @self.flask_app.route('/activate_cone', methods=['POST'])
 
         def flask_activate_cone():
@@ -145,11 +194,6 @@ class OvenWatcher(threading.Thread):
             self.deactivate_cone_mode()
             return 'Cone mode deactivated'
 
-        threading.Thread.__init__(self)
-        self.daemon = True
-        self.oven = oven
-        self.start()
-        self.cone_mode = False
     def monitor_kiln(self):
         # Monitor temperature and kiln behavior
         current_temp = self.oven.get_current_temperature()
@@ -181,6 +225,7 @@ class OvenWatcher(threading.Thread):
                 log.error("Invalid cone type or temperature not available.")
         else:
             log.warning("Cone Mode is already active.")
+
     def start_flask_app(self):
         self.flask_app.run(debug=False, threaded=True)
     def deactivate_cone_mode(self):
@@ -193,9 +238,41 @@ class OvenWatcher(threading.Thread):
     def get_cone_temperature(self, cone_type):
         # Define a mapping from cone types to target temperatures in °C
         cone_temperature_mapping = {
-            "Cone 06": 999,  # Adjust this temperature as needed
-            "Cone 5": 1200,  # Adjust this temperature as needed
-            # Add more cone types and temperatures as required
+             "Cone 12": 1306,  # Adjust values as needed
+            "Cone 11": 1294,  # Adjust values as needed
+            "Cone 10": 1288,
+            "Cone 9": 1260,  # Adjust values as needed
+            "Cone 8": 1249,
+            "Cone 7": 1239,  # Adjust values as needed
+            "Cone 6": 1222,
+            "Cone 5": 1186,  # Adjust values as needed
+            "Cone 4": 1162,
+            "Cone 3": 1152,  # Adjust values as needed
+            "Cone 2": 1142,  # Adjust values as needed
+            "Cone 1": 1137,
+            "Cone 01": 1119,  # Adjust values as needed
+            "Cone 02": 1102,
+            "Cone 03": 1086,  # Adjust values as needed
+            "Cone 04": 1063,
+            "Cone 05": 1031,  # Adjust values as needed
+            "Cone 06": 998,
+            "Cone 07": 976,  # Adjust values as needed
+            "Cone 08": 942,
+            "Cone 09": 920,  # Adjust values as needed
+            "Cone 010": 903,  # Adjust values as needed
+            "Cone 011": 875,
+            "Cone 012": 861,  # Adjust values as needed
+            "Cone 013": 837,  # Adjust values as needed
+            "Cone 014": 807,
+            "Cone 015": 791,  # Adjust values as needed
+            "Cone 016": 772,
+            "Cone 017": 738,  # Adjust values as needed
+            "Cone 018": 715,
+            "Cone 019": 678,  # Adjust values as needed
+            "Cone 020": 626,  # Adjust values as needed
+            "Cone 021": 600,
+            "Cone 022": 586,  # Adjust values as needed
+            # Add more cone types and temperatures as required           
         }
         return cone_temperature_mapping.get(cone_type)
 
