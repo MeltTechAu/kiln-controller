@@ -210,7 +210,7 @@ class ConeModeController:
         self.oven_watcher = oven_watcher
         self.cone_mode_activated = False
         self.cone_target_temp = None
-        self.cone_drop_rate = 3  # 3% of the max temperature in °C
+        self.cone_drop_rate = 3  # 3% of the max temperature in Â°C
         self.cone_max_temp = None
         self.cone_start_time = None
         self.cone_heat_work_done = False
@@ -234,7 +234,7 @@ class ConeModeController:
             self.cone_heat_work_done = False
 
     def get_target_temperature_for_cone(self, cone_type):
-        # Define a mapping from cone types to target temperatures in °C
+        # Define a mapping from cone types to target temperatures in Â°C
         cone_temperature_mapping = {
             "Cone 12": 1306,  # Adjust values as needed
             "Cone 11": 1294,  # Adjust values as needed
