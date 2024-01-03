@@ -10,11 +10,103 @@ from oven import Oven
 log = logging.getLogger(__name__)
 
 # Updated ConeModeController class
-import time
 
-import logging
 
-class ConeModeController:        
+class ConeModeController:
+    def start_countdown(self, duration):
+       # """Starts a countdown for the given duration (in seconds).""nj
+        remaining = duration
+        while remaining > 0:
+            print(f"Time remaining: {remaining} seconds")
+            time.sleep(1)
+            remaining -= 1
+        print("Countdown finished!")
+
+        countdown_thread = threading.Thread(target=countdown)
+        countdown_thread.start()
+
+    
+    # Existing class attributes...
+    a = 0.5  # Example value for a
+    b = 1.0  # Example value for b
+    c = 2.0  # Example value for c
+    max_additional_time = 180  # Example value for max additional time in minutes
+    def log_heatwork_data(self, heatwork, mode):
+        # Log heatwork data to CSV with a timestamp and mode indicator
+        filename = 'heatwork_log.csv'
+        with open(filename, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([datetime.now(), heatwork, mode])
+
+    def log_before_cone_mode(self, heatwork):
+        self.log_heatwork_data(heatwork, 'Before Cone Mode')
+
+    def log_after_cone_mode(self, heatwork):
+        self.log_heatwork_data(heatwork, 'After Cone Mode')
+
+
+    def determine_additional_time_based_on_heatwork(self):
+        # Read the latest CSV file to get the lost heatwork data
+        try:
+            latest_csv = max(glob.glob('log_*.csv'), key=os.path.getctime)
+            with open(latest_csv, 'r') as file:
+                last_row = list(csv.reader(file))[-1]
+                lost_heatwork = float(last_row[2])
+                # 
+        # Complex calculation based on lost heatwork
+            a = CONE_MODE_ADJUSTMENT['a']
+            b = CONE_MODE_ADJUSTMENT['b']
+            c = CONE_MODE_ADJUSTMENT['c']
+
+        # Non-linear relationship for additional time calculation
+            additional_time = c + a * lost_heatwork**2 + b * lost_heatwork
+
+        # Maximum cap for the additional time
+            max_additional_time = 180  # Maximum of 180 minutes
+            additional_time = min(additional_time, max_additional_time)
+
+            return additional_time
+
+                
+        # Implementing the complex calculation based on lost heatwork
+            a = CONE_MODE_ADJUSTMENT['a']  # Coefficient for heatwork's quadratic term
+            b = CONE_MODE_ADJUSTMENT['b']  # Coefficient for heatwork's linear term
+            c = CONE_MODE_ADJUSTMENT['c']  # Base additional time in minutes
+            drop_rate = CONE_MODE_ADJUSTMENT['drop_rate']
+            max_duration = CONE_MODE_ADJUSTMENT['max_duration']
+
+        # Non-linear relationship for additional time calculation
+            calculated_time = c + a * lost_heatwork**2 + b * lost_heatwork
+            calculated_time *= drop_rate  # Adjusting time based on the drop rate
+
+        # Ensuring the calculated time does not exceed the maximum
+            additional_time = min(calculated_time, max_duration)
+            return additional_time
+
+            additional_time = self.calculate_additional_time(lost_heatwork)
+            return additional_time
+        except Exception as e:
+            log.error(f'Error reading CSV file for timer extension: {e}')
+            return default_additional_time
+
+    def log_temperature_and_heatwork_to_csv(self, temperature, lost_heatwork):
+        # Log the temperature and lost heatwork to a CSV file
+        filename = datetime.now().strftime('heatwork_log_%Y-%m-%d.csv')
+        with open(filename, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([datetime.now(), temperature, lost_heatwork])
+
+    def retrieve_latest_heatwork_data(self):
+        # Retrieve the latest lost heatwork data from the most recent CSV file
+        try:
+            latest_csv = max(glob.glob('heatwork_log_*.csv'), key=os.path.getctime)
+            with open(latest_csv, 'r') as file:
+                last_row = list(csv.reader(file))[-1]
+                return float(last_row[2])
+        except Exception as e:
+            log.error(f'Error retrieving heatwork data from CSV: {e}')
+            return None
+        
     def calculate_lost_heatwork(self, current_temp, target_temp, elapsed_time):
         # Simple model: Heatwork = Temperature * Time
         # Calculate the expected heatwork at target temperature
@@ -43,7 +135,7 @@ class ConeModeController:
         self.oven = oven
         self.cone_mode_activated = False
         self.cone_target_temp = None
-        self.cone_drop_rate = 3  # 3% of the max temperature in °C
+        self.cone_drop_rate = 3  # 3% of the max temperature in Â°C
         self.cone_max_temp = None
         self.cone_start_time = None
         self.cone_heat_work_done = False
@@ -125,7 +217,7 @@ class ConeModeController:
                 self.deactivate_cone_mode()
 
     def get_target_temperature_for_cone(self, cone_type):
-        # Define a mapping from cone types to target temperatures in °C
+        # Define a mapping from cone types to target temperatures in Â°C
         cone_temperature_mapping = {
             "Cone 12": 1306,  # Adjust values as needed
             "Cone 11": 1294,  # Adjust values as needed
@@ -220,7 +312,7 @@ class OvenWatcher(threading.Thread):
             if cone_temp is not None:
                 self.cone_mode = True
                 self.cone_target_temp = cone_temp
-                log.info(f"Cone Mode activated for {cone_type}. Target temperature: {self.cone_target_temp}°C")
+                log.info(f"Cone Mode activated for {cone_type}. Target temperature: {self.cone_target_temp}Â°C")
             else:
                 log.error("Invalid cone type or temperature not available.")
         else:
@@ -236,7 +328,7 @@ class OvenWatcher(threading.Thread):
             log.warning("Cone Mode is not currently active.")
 
     def get_cone_temperature(self, cone_type):
-        # Define a mapping from cone types to target temperatures in °C
+        # Define a mapping from cone types to target temperatures in Â°C
         cone_temperature_mapping = {
              "Cone 12": 1306,  # Adjust values as needed
             "Cone 11": 1294,  # Adjust values as needed
