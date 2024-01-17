@@ -4,6 +4,13 @@ import os
 # uncomment this if using MAX-31856
 #from lib.max31856 import MAX31856
 
+
+########################################################################
+# Pin to control safety contactor. Should be wired to cut power to all heater #circuits.
+#safety_switch = 20
+#Set true for active high, false for active low
+#safety_switch_active_value = False                  ###has problems ith os works or dosnt hmmmmmmmm?????works in reverse make  saftey main heater and heater main safety
+
 ########################################################################
 #
 #   General options
@@ -186,4 +193,5 @@ automatic_restart_state_file = os.path.abspath(os.path.join(os.path.dirname( __f
 # See https://github.com/jbruce12000/kiln-profiles
 kiln_profiles_directory = os.path.abspath(os.path.join(os.path.dirname( __file__ ),"storage", "profiles")) 
 #kiln_profiles_directory = os.path.abspath(os.path.join(os.path.dirname( __file__ ),'..','kiln-profiles','pottery')) 
+
 
