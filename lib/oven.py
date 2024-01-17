@@ -1,3 +1,5 @@
+from cone import ConeModeController  # Importing ConeModeController from cone module
+
 import threading
 import time
 import random
@@ -165,14 +167,15 @@ class TempSensorReal(TempSensor):
                 self.bad_count = 0
                 self.ok_count = 0
                 self.bad_stamp = time.time()
+           # self.activate_cone_mode('default_cone_type')  # Replace 'default_cone_type' as needed
 
-            temp = self.thermocouple.get()
-            self.noConnection = self.thermocouple.noConnection
-            self.shortToGround = self.thermocouple.shortToGround
-            self.shortToVCC = self.thermocouple.shortToVCC
-            self.unknownError = self.thermocouple.unknownError
+                temp = self.thermocouple.get()
+                self.noConnection = self.thermocouple.noConnection
+                self.shortToGround = self.thermocouple.shortToGround
+                self.shortToVCC = self.thermocouple.shortToVCC
+                self.unknownError = self.thermocouple.unknownError
 
-            is_bad_value = self.noConnection | self.unknownError
+                is_bad_value = self.noConnection | self.unknownError
             if not config.ignore_tc_short_errors:
                 is_bad_value |= self.shortToGround | self.shortToVCC
 
@@ -205,91 +208,6 @@ class TempSensorReal(TempSensor):
         temps = temps[items:total-items]
         return sum(temps) / len(temps)
         
-class ConeModeController:
-    def __init__(self, oven_watcher):
-        self.oven_watcher = oven_watcher
-        self.cone_mode_activated = False
-        self.cone_target_temp = None
-        self.cone_drop_rate = 3  # 3% of the max temperature in Â°C
-        self.cone_max_temp = None
-        self.cone_start_time = None
-        self.cone_heat_work_done = False
-
-    def activate_cone_mode(self, cone_type):
-        if not self.cone_mode_activated:
-            self.cone_target_temp = self.get_target_temperature_for_cone(cone_type)
-            self.cone_max_temp = self.oven_watcher.oven.get_max_temperature()
-            self.cone_mode_activated = True
-            self.cone_start_time = time.time()
-            self.cone_heat_work_done = False
-            self.oven_watcher.oven.set_target_temperature(self.cone_target_temp)
-
-    def deactivate_cone_mode(self):
-        if self.cone_mode_activated:
-            self.oven_watcher.oven.set_target_temperature(0)  # Turn off the kiln
-            self.cone_mode_activated = False
-            self.cone_target_temp = None
-            self.cone_max_temp = None
-            self.cone_start_time = None
-            self.cone_heat_work_done = False
-
-    def get_target_temperature_for_cone(self, cone_type):
-        # Define a mapping from cone types to target temperatures in Â°C
-        cone_temperature_mapping = {
-            "Cone 12": 1306,  # Adjust values as needed
-            "Cone 11": 1294,  # Adjust values as needed
-            "Cone 10": 1288,
-            "Cone 9": 1260,  # Adjust values as needed
-            "Cone 8": 1249,
-            "Cone 7": 1239,  # Adjust values as needed
-            "Cone 6": 1222,
-            "Cone 5": 1186,  # Adjust values as needed
-            "Cone 4": 1162,
-            "Cone 3": 1152,  # Adjust values as needed
-            "Cone 2": 1142,  # Adjust values as needed
-            "Cone 1": 1137,
-            "Cone 01": 1119,  # Adjust values as needed
-            "Cone 02": 1102,
-            "Cone 03": 1086,  # Adjust values as needed
-            "Cone 04": 1063,
-            "Cone 05": 1031,  # Adjust values as needed
-            "Cone 06": 998,
-            "Cone 07": 976,  # Adjust values as needed
-            "Cone 08": 942,
-            "Cone 09": 920,  # Adjust values as needed
-            "Cone 010": 903,  # Adjust values as needed
-            "Cone 011": 875,
-            "Cone 012": 861,  # Adjust values as needed
-            "Cone 013": 837,  # Adjust values as needed
-            "Cone 014": 807,
-            "Cone 015": 791,  # Adjust values as needed
-            "Cone 016": 772,
-            "Cone 017": 738,  # Adjust values as needed
-            "Cone 018": 715,
-            "Cone 019": 678,  # Adjust values as needed
-            "Cone 020": 626,  # Adjust values as needed
-            "Cone 021": 600,
-            "Cone 022": 586,  # Adjust values as needed
-            # Add more cone types and temperatures as required
-        }
-        return cone_temperature_mapping.get(cone_type, 0)
-
-    def update_cone_mode(self):
-        if self.cone_mode_activated:
-            current_temp = self.oven_watcher.oven.get_current_temperature()
-
-            if current_temp >= self.cone_max_temp:
-                # Kiln has reached or exceeded the maximum temperature
-                self.cone_heat_work_done = True
-                self.oven_watcher.oven.set_target_temperature(current_temp)
-            elif not self.cone_heat_work_done:
-                # Continue heating at the maximum temperature until heat work is done
-                self.oven_watcher.oven.set_target_temperature(self.cone_max_temp)
-            else:
-                # Gradually reduce temperature by the drop rate
-                new_target_temp = max(current_temp - (self.cone_drop_rate), 0)
-                self.oven_watcher.oven.set_target_temperature(new_target_temp)
-
 
 class Oven(threading.Thread):
     '''parent oven class. this has all the common code
@@ -515,7 +433,17 @@ class Oven(threading.Thread):
 
         log.info("automatically restarting profile = %s at minute = %d" % (profile_path,startat))
         with open(profile_path) as infile:
-            profile_json = json.dumps(json.load(infile))
+            profile_json
+            
+    def run(self):
+        self.start_heatwork_logging()
+        while self.oven.is_running():
+            # Include logic to determine cone_number and additional_info
+            cone_number = 1  # Placeholder for cone number
+            additional_info = 'Placeholder info'  # Placeholder for additional info
+            self.log_heatwork(cone_number, additional_info)
+            time.sleep(1)  # Check every second
+        #    self.stop_heatwork_logging()json = json.dumps(json.load(infile))
         profile = Profile(profile_json)
         self.run_profile(profile,startat=startat)
         self.cost = d["cost"]
@@ -542,6 +470,7 @@ class Oven(threading.Thread):
                 self.heat_then_cool()
                 self.reset_if_emergency()
                 self.reset_if_schedule_ended()
+        self.activate_cone_mode('default_cone_type')  # Replace 'default_cone_type' as needed
 
  #   def forceOff(self):
  #       self.safety_switch.off()
@@ -820,10 +749,109 @@ def set_oven_temp():
     if cone_type:
         # Assuming 'oven_watcher' is an instance available in this context
         cone_mode_controller = ConeModeController(oven_watcher)
-        cone_mode_controller.activate_cone_mode(cone_type)
+        cone_mode_controller.activate_cone_mode(cone_type, oven_watcher)
         return {"status": "Cone mode activated successfully"}
     else:
         return {"status": "Invalid cone type"}, 400
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+    def activate_cone_mode(self, cone_type):
+        if not config.CONE_MODE_ENABLED:
+            logging.info('Cone mode is disabled in the configuration.')
+            return  # Exit the method if cone mode is disabled
+        
+        if not config.CONE_MODE_ENABLED:
+            logging.info('Cone mode is disabled in the configuration.')
+            return  # Exit the method if cone mode is disabled
+        
+        # Assuming cone_mode_controller is an instance of ConeModeController
+        # and has a method 'activate_cone_mode' which activates cone mode
+        cone_mode_controller = ConeModeController(self)
+        cone_mode_controller.activate_cone_mode(cone_type, self)
+        log.info(f"Cone mode activated for cone type {cone_type}")
+
+    def adjust_cone_drop_rate(self):
+        # Implement the logic to adjust the cone drop rate
+            drop_rate = config.CONE_MODE_DROP_RATE
+    # Add logic to gradually drop temperature at the defined rate
+    log.info("Cone drop rate adjusted")
+
+    def record_heatwork(self):
+        # Record the timestamp and current temperature
+        with open('heatwork_log.csv', 'a', newline='') as file:
+            writer = csv.writer(file)
+            current_temperature = self.get_current_temperature()
+            writer.writerow([datetime.datetime.now(), current_temperature])
+        log.info("Heatwork data recorded")
+
+    def get_current_temperature(self):
+        # Replace with the actual method to read the current temperatue
+        return self.board.temp_sensor.temperature
+
+    # Initialize MAX31855 with Hardware SPI, fallback to Software SPI on failure
+    try:
+        self.max31855 = MAX31855_HardwareSPI(cs_pin=config.MAX31855_CS_PIN)
+        logging.info("Using Hardware SPI for MAX31855")
+    except Exception as e:
+        logging.error("Hardware SPI for MAX31855 not available, falling back to software SPI")
+        self.max31855 = MAX31855_SoftwareSPI(cs_pin=config.MAX31855_CS_PIN, 
+                                            clock_pin=config.MAX31855_CLK_PIN, 
+                                            data_pin=config.MAX31855_DO_PIN)
+
+    # Initialize MAX31856 with Hardware SPI, fallback to Software SPI on failure
+    try:
+        self.max31856 = MAX31856_HardwareSPI(cs_pin=config.MAX31856_CS_PIN,
+                                            clock_pin=config.MAX31856_CLK_PIN,
+                                            data_in_pin=config.MAX31856_DI_PIN,
+                                            data_out_pin=config.MAX31856_DO_PIN)
+        logging.info("Using Hardware SPI for MAX31856")
+    except Exception as e:
+        logging.error("Hardware SPI for MAX31856 not available, falling back to software SPI")
+        self.max31856 = MAX31856_SoftwareSPI(cs_pin=config.MAX31856_CS_PIN, 
+                                            clock_pin=config.MAX31856_CLK_PIN, 
+                                            data_pin=config.MAX31856_DO_PIN)
+
+   # def check_thermocouple_errors(self):
+        # Placeholder for checking thermocouple errors
+        
+    def check_thermocouple_errors(self):
+        # Checking errors for MAX31855
+        if self.max31855.has_error():
+            max31855_error = self.max31855.get_error()
+            if 'short_to_ground' in max31855_error and config.TC_ERROR_HANDLING['short_to_ground']:
+                logging.error("MAX31855 error: short to ground")
+                # Add any additional error handling here
+            if 'short_to_vcc' in max31855_error and config.TC_ERROR_HANDLING['short_to_vcc']:
+                logging.error("MAX31855 error: short to VCC")
+                # Add any additional error handling here
+            if 'no_connection' in max31855_error and config.TC_ERROR_HANDLING['no_connection']:
+                logging.error("MAX31855 error: no connection")
+                # Add any additional error handling here
+
+        # Checking errors for MAX31856
+        if self.max31856.has_error():
+            max31856_error = self.max31856.get_error()
+            if 'short_to_ground' in max31856_error and config.TC_ERROR_HANDLING['short_to_ground']:
+                logging.error("MAX31856 error: short to ground")
+                # Add any additional error handling here
+            if 'short_to_vcc' in max31856_error and config.TC_ERROR_HANDLING['short_to_vcc']:
+                logging.error("MAX31856 error: short to VCC")
+                # Add any additional error handling here
+            if 'no_connection' in max31856_error and config.TC_ERROR_HANDLING['no_connection']:
+                logging.error("MAX31856 error: no connection")
+                # Add any additional error handling here
+
+        errors = {}  # Replace with actual error data
+        if config.TC_ERROR_HANDLING['short_to_ground'] and errors.get('short_to_ground'):
+            logging.error("Thermocouple error: short to ground")
+            # Add any additional error handling here
+        if config.TC_ERROR_HANDLING['short_to_vcc'] and errors.get('short_to_vcc'):
+            logging.error("Thermocouple error: short to VCC")
+            # Add any additional error handling here
+        if config.TC_ERROR_HANDLING['no_connection'] and errors.get('no_connection'):
+            logging.error("Thermocouple error: no connection")
+            # Add any additional error handling here
+
