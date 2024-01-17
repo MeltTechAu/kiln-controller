@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+######???????????from oven_watcher import ConeModeController
 import os
 import sys
 import logging
@@ -45,6 +45,22 @@ ovenWatcher = OvenWatcher(oven)
 # this ovenwatcher is used in the oven class for restarts
 oven.set_ovenwatcher(ovenWatcher)
 
+# Instantiating the ConeModeController
+#########?????????cone_mode_controller = ConeModeController()
+
+@app.route('/set-cone-mode', method='POST')
+def set_cone_mode():
+    try:
+        # Extract the cone mode additional time from the request
+        additional_time = request.json.get('additional_time', 0)
+
+        # Activating the cone mode
+        cone_mode_controller.activate_cone_mode(additional_time)
+
+        return {'status': 'success', 'message': f'Cone mode activated with additional time {additional_time}'}
+    except Exception as e:
+        log.error(f'Error in setting cone mode: {str(e)}')
+        return {'status': 'error', 'message': str(e)}
 @app.route('/api/cone-mode', method='POST')
 def set_cone_mode():
     data = bottle.request.json
@@ -53,7 +69,6 @@ def set_cone_mode():
     else:
         ovenWatcher.deactivate_cone_mode()
     return {"success": True}
-
 
 @app.route('/')
 def index():
@@ -306,4 +321,197 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+@post('/activate_cone')
+def activate_cone():
+    oven_watcher = oven.get_watcher()
+    oven_watcher.activate_cone_mode()
+    toggleConeLight(True)  # Ensure this function is defined or imported
+    response.contlent_type = 'application/json'
+    return jsonify({'status': 'Cone mode activated'})
+
+
+@post('/start_cone_mode')
+def start_cone_mode():
+    watcher.activate_cone_mode()
+    response.content_type = 'application/json'
+    return jsonify({'message': 'Cone mode activated'})
+
+
+# Enhanced Cone Mode Implementation
+class ConeMode:
+    def __init__(self, target_profile):
+        self.target_profile = target_profile
+        self.current_temp = 0
+        self.target_temp = self.target_profile[0]  # Starting with the first temperature in the profile
+
+    def update_temperature(self, new_temp):
+        self.current_temp = new_temp
+        # Logic to adjust kiln temperature based on profile
+
+    def check_safety(self):
+        # Implement safety checks
+        if self.current_temp > some_safe_limit:
+            self.shutdown()
+
+    def shutdown(self):
+        # Logic to safely shut down the kiln
+        pass
+
+# Note: This is a simplified representation. Actual implementation will depend on specific project requirements.
+
+class TimerControl:
+    def __init__(self):
+        self.timer = 0
+
+    def set_timer(self, time_in_seconds):
+        self.timer = time_in_seconds
+
+    def extend_timer(self, additional_time):
+        self.timer += additional_time
+        # Additional logic to handle extended time
+
+class ConeModeControl:
+    def __init__(self):
+        self.active = False
+
+    def activate_cone_mode(self):
+        self.active = True
+        # Logic to activate Cone Mode, set temperature profiles, etc.
+
+    def deactivate_cone_mode(self):
+        self.active = False
+        # Logic to deactivate Cone Mode
+
+
+# app.py
+from flask import Flask, render_template, request, jsonify
+from oven import Oven, OvenWatcher
+
+app = Flask(__name)
+oven = Oven()
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# Update the routes in app.py
+@app.route('/activate_cone', methods=['POST'])
+def activate_cone():
+    oven_watcher = oven.get_watcher()
+    oven_watcher.activate_cone_mode()
+    toggleConeLight(True)  # Turn on the light
+    return jsonify({'status': 'Cone mode activated'})
+
+@app.route('/deactivate_cone', methods=['POST'])
+def deactivate_cone():
+    oven_watcher = oven.get_watcher()
+    oven_watcher.deactivate_cone_mode()
+    toggleConeLight(False)  # Turn off the light
+    return jsonify({'status': 'Cone mode deactivated'})
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+import threading
+from flask import Flask, render_template, request, jsonify
+from oven_watcher import OvenWatcher  # Import the OvenWatcher class
+
+app = Flask(__name__)
+
+# Create an instance of OvenWatcher
+oven = Oven()
+watcher = OvenWatcher(oven)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/start_cone_mode', methods=['POST'])
+def start_cone_mode():
+    watcher.activate_cone_mode()
+    return jsonify({'message': 'Cone mode activated'})
+
+@app.route('/stop_cone_mode', methods=['POST'])
+def stop_cone_mode():
+    watcher.deactivate_cone_mode()
+    return jsonify({'message': 'Cone mode deactivated'})
+
+if __name__ == '__main__':
+    # Start the OvenWatcher thread
+    watcher.start()
+
+    # Start the Flask application
+    app.run(debug=True)
+
+
+# Timer mechanism
+import threading
+import time
+
+class KilnTimer:
+    def __init__(self):
+        self.remaining_time = 0
+        self.timer_thread = None
+        self.timer_active = False
+
+    def start_timer(self, duration):
+        self.remaining_time = duration
+        self.timer_thread = threading.Thread(target=self.countdown)
+        self.timer_thread.start()
+        self.timer_active = True
+
+    def countdown(self):
+        while self.remaining_time > 0:
+            time.sleep(1)
+            self.remaining_time -= 1
+            if self.remaining_time == 60:  # One minute left
+                # Trigger cone mode activation
+                set_cone_mode('cone')
+
+    def stop_timer(self):
+        self.remaining_time = 0
+        self.timer_active = False
+        if self.timer_thread:
+            self.timer_thread.join()
+
+# Creating a timer instance
+kiln_timer = KilnTimer()
+
+
+from oven_watcher import ConeModeController
+
+# Creating an instance of ConeModeController
+cone_mode_controller = ConeModeController()
+
+# Example of integrating ConeModeController methods
+def initiate_cone_mode():
+    additional_time = cone_mode_controller.calculate_additional_time()
+    cone_mode_controller.set_cone_mode(additional_time)
+
+# Assuming there are conditions or triggers in the code that call initiate_cone_mode
+
+class KilnController:
+    def __init__(self, oven_watcher):
+        # Initialize the kiln controller
+        self.current_mode = None
+        self.oven_watcher = oven_watcher
+
+    def set_cone_mode(self, selected_cone):
+        # Use the existing OvenWatcher's method to get the target temperature for the selected cone
+        target_temperature = self.oven_watcher.get_target_temperature_for_cone(selected_cone)
+        if target_temperature == 0:
+            print(f"Invalid cone mode: {selected_cone}")
+            return
+
+        # Set the kiln to the specified cone mode
+        self.current_mode = selected_cone
+        # Assuming there is a method to set the kiln's temperature
+        # self.kiln.set_temperature(target_temperature)
+        print(f"Setting kiln to cone mode: {selected_cone} at {target_temperature} degrees")
+
 
