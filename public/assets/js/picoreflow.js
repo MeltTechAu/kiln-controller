@@ -109,7 +109,7 @@ function updateProfileTable()
     var color = "";
 
     var html = '<h3>Schedule Points</h3><div class="table-responsive" style="scroll: none"><table class="table table-striped">';
-        html += '<tr><th style="width: 50px">#</th><th>Target Time in ' + time_scale_long+ '</th><th>Target Temperature in °'+temp_scale_display+'</th><th>Slope in &deg;'+temp_scale_display+'/'+time_scale_slope+'</th><th></th></tr>';
+        html += '<tr><th style="width: 50px">#</th><th>Target Time in ' + time_scale_long+ '</th><th>Target Temperature in Â°'+temp_scale_display+'</th><th>Slope in &deg;'+temp_scale_display+'/'+time_scale_slope+'</th><th></th></tr>';
 
     for(var i=0; i<graph.profile.data.length;i++)
     {
@@ -616,8 +616,8 @@ $(document).ready(function()
             if (temp_scale == "c") {temp_scale_display = "C";} else {temp_scale_display = "F";}
 
 
-            $('#act_temp_scale').html('º'+temp_scale_display);
-            $('#target_temp_scale').html('º'+temp_scale_display);
+            $('#act_temp_scale').html('Âº'+temp_scale_display);
+            $('#target_temp_scale').html('Âº'+temp_scale_display);
 
             switch(time_scale_profile){
                 case "s":
@@ -793,3 +793,24 @@ document.getElementById('extendTimerButton').addEventListener('click', function(
     .then(data => console.log(data));
 });
 
+
+// ... existing code ...
+
+// Function to handle timer updates from backend
+function updateTimerDisplay(extendedTime) {
+    document.getElementById('timerDisplay').innerText = extendedTime;
+}
+
+// WebSocket listener for timer updates
+ws_control.onmessage = function(event) {
+    var data = JSON.parse(event.data);
+    if (data.type === 'timerUpdate') {
+        updateTimerDisplay(data.elapsedTime);
+    }
+};
+
+// Function to request timer start/stop
+function toggleTimer(start) {
+    var message = { type: 'toggleTimer', start: start };
+    ws_control.send(JSON.stringify(message));
+}
