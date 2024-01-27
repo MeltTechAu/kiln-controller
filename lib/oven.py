@@ -759,14 +759,6 @@ if __name__ == '__main__':
 
 
     def activate_cone_mode(self, cone_type):
-        if not config.CONE_MODE_ENABLED:
-            logging.info('Cone mode is disabled in the configuration.')
-            return  # Exit the method if cone mode is disabled
-        
-        if not config.CONE_MODE_ENABLED:
-            logging.info('Cone mode is disabled in the configuration.')
-            return  # Exit the method if cone mode is disabled
-        
         # Assuming cone_mode_controller is an instance of ConeModeController
         # and has a method 'activate_cone_mode' which activates cone mode
         cone_mode_controller = ConeModeController(self)
@@ -775,9 +767,7 @@ if __name__ == '__main__':
 
     def adjust_cone_drop_rate(self):
         # Implement the logic to adjust the cone drop rate
-            drop_rate = config.CONE_MODE_DROP_RATE
-    # Add logic to gradually drop temperature at the defined rate
-    log.info("Cone drop rate adjusted")
+        log.info("Cone drop rate adjusted")
 
     def record_heatwork(self):
         # Record the timestamp and current temperature
@@ -788,70 +778,5 @@ if __name__ == '__main__':
         log.info("Heatwork data recorded")
 
     def get_current_temperature(self):
-        # Replace with the actual method to read the current temperatue
+        # Replace with the actual method to read the current temperature
         return self.board.temp_sensor.temperature
-
-    # Initialize MAX31855 with Hardware SPI, fallback to Software SPI on failure
-    try:
-        self.max31855 = MAX31855_HardwareSPI(cs_pin=config.MAX31855_CS_PIN)
-        logging.info("Using Hardware SPI for MAX31855")
-    except Exception as e:
-        logging.error("Hardware SPI for MAX31855 not available, falling back to software SPI")
-        self.max31855 = MAX31855_SoftwareSPI(cs_pin=config.MAX31855_CS_PIN, 
-                                            clock_pin=config.MAX31855_CLK_PIN, 
-                                            data_pin=config.MAX31855_DO_PIN)
-
-    # Initialize MAX31856 with Hardware SPI, fallback to Software SPI on failure
-    try:
-        self.max31856 = MAX31856_HardwareSPI(cs_pin=config.MAX31856_CS_PIN,
-                                            clock_pin=config.MAX31856_CLK_PIN,
-                                            data_in_pin=config.MAX31856_DI_PIN,
-                                            data_out_pin=config.MAX31856_DO_PIN)
-        logging.info("Using Hardware SPI for MAX31856")
-    except Exception as e:
-        logging.error("Hardware SPI for MAX31856 not available, falling back to software SPI")
-        self.max31856 = MAX31856_SoftwareSPI(cs_pin=config.MAX31856_CS_PIN, 
-                                            clock_pin=config.MAX31856_CLK_PIN, 
-                                            data_pin=config.MAX31856_DO_PIN)
-
-   # def check_thermocouple_errors(self):
-        # Placeholder for checking thermocouple errors
-        
-    def check_thermocouple_errors(self):
-        # Checking errors for MAX31855
-        if self.max31855.has_error():
-            max31855_error = self.max31855.get_error()
-            if 'short_to_ground' in max31855_error and config.TC_ERROR_HANDLING['short_to_ground']:
-                logging.error("MAX31855 error: short to ground")
-                # Add any additional error handling here
-            if 'short_to_vcc' in max31855_error and config.TC_ERROR_HANDLING['short_to_vcc']:
-                logging.error("MAX31855 error: short to VCC")
-                # Add any additional error handling here
-            if 'no_connection' in max31855_error and config.TC_ERROR_HANDLING['no_connection']:
-                logging.error("MAX31855 error: no connection")
-                # Add any additional error handling here
-
-        # Checking errors for MAX31856
-        if self.max31856.has_error():
-            max31856_error = self.max31856.get_error()
-            if 'short_to_ground' in max31856_error and config.TC_ERROR_HANDLING['short_to_ground']:
-                logging.error("MAX31856 error: short to ground")
-                # Add any additional error handling here
-            if 'short_to_vcc' in max31856_error and config.TC_ERROR_HANDLING['short_to_vcc']:
-                logging.error("MAX31856 error: short to VCC")
-                # Add any additional error handling here
-            if 'no_connection' in max31856_error and config.TC_ERROR_HANDLING['no_connection']:
-                logging.error("MAX31856 error: no connection")
-                # Add any additional error handling here
-
-        errors = {}  # Replace with actual error data
-        if config.TC_ERROR_HANDLING['short_to_ground'] and errors.get('short_to_ground'):
-            logging.error("Thermocouple error: short to ground")
-            # Add any additional error handling here
-        if config.TC_ERROR_HANDLING['short_to_vcc'] and errors.get('short_to_vcc'):
-            logging.error("Thermocouple error: short to VCC")
-            # Add any additional error handling here
-        if config.TC_ERROR_HANDLING['no_connection'] and errors.get('no_connection'):
-            logging.error("Thermocouple error: no connection")
-            # Add any additional error handling here
-
