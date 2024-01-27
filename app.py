@@ -28,3 +28,14 @@ def deactivate_cone():
 if __name__ == '__main__':
     app.run(debug=True)
 
+
+@route('/activate_cone_mode', method='POST')
+def activate_cone_mode():
+    cone_number = request.json.get('cone_number')
+    oven.cone_mode.activate_cone_mode(cone_number)
+    return {'status': 'Cone mode activated'}
+
+@route('/deactivate_cone_mode', method='POST')
+def deactivate_cone_mode():
+    oven.cone_mode.deactivate_cone_mode()
+    return {'status': 'Cone mode deactivated'}
