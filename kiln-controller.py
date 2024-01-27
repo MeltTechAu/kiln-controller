@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-######???????????from oven_watcher import ConeModeController
+#from oven_watcher import ConeModeController
 import os
 import sys
 import logging
@@ -46,21 +46,7 @@ ovenWatcher = OvenWatcher(oven)
 oven.set_ovenwatcher(ovenWatcher)
 
 # Instantiating the ConeModeController
-#########?????????cone_mode_controller = ConeModeController()
-
-@app.route('/set-cone-mode', method='POST')
-def set_cone_mode():
-    try:
-        # Extract the cone mode additional time from the request
-        additional_time = request.json.get('additional_time', 0)
-
-        # Activating the cone mode
-        cone_mode_controller.activate_cone_mode(additional_time)
-
-        return {'status': 'success', 'message': f'Cone mode activated with additional time {additional_time}'}
-    except Exception as e:
-        log.error(f'Error in setting cone mode: {str(e)}')
-        return {'status': 'error', 'message': str(e)}
+#cone_mode_controller = ConeModeController()
 @app.route('/api/cone-mode', method='POST')
 def set_cone_mode():
     data = bottle.request.json
@@ -69,6 +55,7 @@ def set_cone_mode():
     else:
         ovenWatcher.deactivate_cone_mode()
     return {"success": True}
+
 
 @app.route('/')
 def index():
@@ -323,6 +310,33 @@ if __name__ == "__main__":
     main()
 
 
+@post('/activate_cone')
+def activate_cone():
+    oven_watcher = oven.get_watcher()
+    oven_watcher.activate_cone_mode()
+    toggleConeLight(True)  # Ensure this function is defined or imported
+    response.content_type = 'application/json'
+    return jsonify({'status': 'Cone mode activated'})
+
+
+@post('/start_cone_mode')
+def start_cone_mode():
+    watcher.activate_cone_mode()
+    response.content_type = 'application/json'
+    return jsonify({'message': 'Cone mode activated'})
+
+# Additions for cone mode API endpoints
+
+@app.route('/api/cone-mode/activate', method='POST')
+def activate_cone_mode():
+    cone_profile = request.json.get('cone_profile')
+    ovenWatcher.activate_cone_mode(cone_profile)
+    return {"success": True, "message": "Cone mode activated."}
+
+@app.route('/api/cone-mode/deactivate', method='POST')
+def deactivate_cone_mode():
+    ovenWatcher.deactivate_cone_mode()
+    return {"success": True, "message": "Cone mode deactivated."}
 
 @post('/activate_cone')
 def activate_cone():
@@ -513,5 +527,4 @@ class KilnController:
         # Assuming there is a method to set the kiln's temperature
         # self.kiln.set_temperature(target_temperature)
         print(f"Setting kiln to cone mode: {selected_cone} at {target_temperature} degrees")
-
 
