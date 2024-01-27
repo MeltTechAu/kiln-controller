@@ -321,3 +321,27 @@ class ConeModeController:
             writer = csv.writer(file)
             writer.writerow([datetime.datetime.now(), self.oven.get_current_temperature(), cone_number, additional_info])
             log.info(f"Heatwork data logged for cone {cone_number}")
+
+
+import threading
+import time
+import datetime
+
+class ConeModeController:
+    # ... existing code ...
+
+    def start_timer(self):
+        self.cone_start_time = datetime.datetime.now()
+
+    def stop_timer(self):
+        self.cone_start_time = None
+
+    def get_elapsed_time(self):
+        if self.cone_start_time:
+            return (datetime.datetime.now() - self.cone_start_time).total_seconds()
+        return 0
+
+    # Method to send timer update via WebSocket
+    def send_timer_update(self):
+        elapsed_time = self.get_elapsed_time()
+        # Code to send elapsed_time to frontend via WebSocket
