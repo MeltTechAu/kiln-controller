@@ -7,6 +7,8 @@ import json
 import config
 import os
 
+from threading import Timer
+
 log = logging.getLogger(__name__)
 
 class DupFilter(object):
@@ -112,8 +114,6 @@ class TempSensorSimulated(TempSensor):
     def __init__(self):
         TempSensor.__init__(self)
 
-import pygame  # Import the pygame library
-
 class TempSensorReal(TempSensor):
     '''real temperature sensor thread that takes N measurements
        during the time_step'''
@@ -145,11 +145,6 @@ class TempSensorReal(TempSensor):
                                          ac_freq_50hz = config.ac_freq_50hz,
                                          )
 
-        # Initialize pygame for sound
-        pygame.mixer.init()
-        self.no_connection_sound = pygame.mixer.Sound("no_connection.wav")  # Replace with your sound file
-
-
     def run(self):
         '''use a moving average of config.temperature_average_samples across the time_step'''
         temps = []
@@ -171,7 +166,7 @@ class TempSensorReal(TempSensor):
             self.unknownError = self.thermocouple.unknownError
 
             is_bad_value = self.noConnection | self.unknownError
-            if not config.ignore_tc_short_errors:
+            if config.honour_theromocouple_short_errors:
                 is_bad_value |= self.shortToGround | self.shortToVCC
 
             if not is_bad_value:
@@ -183,9 +178,6 @@ class TempSensorReal(TempSensor):
             else:
                 log.error("Problem reading temp N/C:%s GND:%s VCC:%s ???:%s" % (self.noConnection,self.shortToGround,self.shortToVCC,self.unknownError))
                 self.bad_count += 1
-
-                # Play a sound notification for "no connection" error
-                self.no_connection_sound.play()
 
             if len(temps):
                 self.temperature = self.get_avg_temp(temps)
@@ -202,58 +194,6 @@ class TempSensorReal(TempSensor):
         items = int(total*chop)
         temps = temps[items:total-items]
         return sum(temps) / len(temps)
-class ConeModeController:
-    def __init__(self, oven_watcher):
-        self.oven_watcher = oven_watcher
-        self.cone_mode_activated = False
-        self.cone_target_temp = None
-        self.cone_drop_rate = 3  # 3% of the max temperature in °C
-        self.cone_max_temp = None
-        self.cone_start_time = None
-        self.cone_heat_work_done = False
-
-    def activate_cone_mode(self, cone_type):
-        if not self.cone_mode_activated:
-            self.cone_target_temp = self.get_target_temperature_for_cone(cone_type)
-            self.cone_max_temp = self.oven_watcher.oven.get_max_temperature()
-            self.cone_mode_activated = True
-            self.cone_start_time = time.time()
-            self.cone_heat_work_done = False
-            self.oven_watcher.oven.set_target_temperature(self.cone_target_temp)
-
-    def deactivate_cone_mode(self):
-        if self.cone_mode_activated:
-            self.oven_watcher.oven.set_target_temperature(0)  # Turn off the kiln
-            self.cone_mode_activated = False
-            self.cone_target_temp = None
-            self.cone_max_temp = None
-            self.cone_start_time = None
-            self.cone_heat_work_done = False
-
-    def get_target_temperature_for_cone(self, cone_type):
-        # Define a mapping from cone types to target temperatures in °C
-        cone_temperature_mapping = {
-            "Cone 06": 1010,
-            "Cone 5": 1204,  # Adjust values as needed
-            # Add more cone types and temperatures as required
-        }
-        return cone_temperature_mapping.get(cone_type, 0)
-
-    def update_cone_mode(self):
-        if self.cone_mode_activated:
-            current_temp = self.oven_watcher.oven.get_current_temperature()
-
-            if current_temp >= self.cone_max_temp:
-                # Kiln has reached or exceeded the maximum temperature
-                self.cone_heat_work_done = True
-                self.oven_watcher.oven.set_target_temperature(current_temp)
-            elif not self.cone_heat_work_done:
-                # Continue heating at the maximum temperature until heat work is done
-                self.oven_watcher.oven.set_target_temperature(self.cone_max_temp)
-            else:
-                # Gradually reduce temperature by the drop rate
-                new_target_temp = max(current_temp - (self.cone_drop_rate), 0)
-                self.oven_watcher.oven.set_target_temperature(new_target_temp)
 
 class Oven(threading.Thread):
     '''parent oven class. this has all the common code
@@ -263,11 +203,17 @@ class Oven(threading.Thread):
         self.daemon = True
         self.temperature = 0
         self.time_step = config.sensor_time_wait
+        self.scheduled_run_timer = None
+        self.start_datetime = None
         self.reset()
 
     def reset(self):
-        self.cost = 0
         self.state = "IDLE"
+        if self.scheduled_run_timer and self.scheduled_run_timer.is_alive():
+            log.info("Cancelling previously scheduled run")
+            self.scheduled_run_timer.cancel()
+            self.start_datetime = None
+        self.cost = 0
         self.profile = None
         self.start_time = 0
         self.runtime = 0
@@ -276,9 +222,15 @@ class Oven(threading.Thread):
         self.heat = 0
         self.pid = PID(ki=config.pid_ki, kd=config.pid_kd, kp=config.pid_kp)
 
-    def run_profile(self, profile, startat=0):
-        self.reset()
+    def run_profile(self, profile, startat=0, resume = False):
 
+        self.reset()
+        if resume:
+            progress = self.profile.findTemp(self.temp_sensor.temperature)
+            self.start_time = datetime.datetime.now() - progress
+            log.info("Skipping ahead to %s", str(progress))
+        else:
+            self.start_time = datetime.datetime.now()
         if self.board.temp_sensor.noConnection:
             log.info("Refusing to start profile - thermocouple not connected")
             return
@@ -292,14 +244,47 @@ class Oven(threading.Thread):
             log.info("Refusing to start profile - thermocouple unknown error")
             return
 
+        if resume:
+            progress = self.profile.findTemp(self.temp_sensor.temperature)
+            self.start_time = datetime.datetime.now() - progress
+            log.info("Skipping ahead to %s", str(progress))
+        else:
+            self.start_time = datetime.datetime.now()
         self.startat = startat * 60
         self.runtime = self.startat
         self.start_time = datetime.datetime.now() - datetime.timedelta(seconds=self.startat)
         self.profile = profile
         self.totaltime = profile.get_duration()
+
         self.state = "RUNNING"
         log.info("Running schedule %s starting at %d minutes" % (profile.name,startat))
         log.info("Starting")
+
+    def scheduled_run(self, start_datetime, profile, run_trigger, startat=0):
+        self.reset()
+        seconds_until_start = (
+            start_datetime - datetime.datetime.now()
+        ).total_seconds()
+        if seconds_until_start <= 0:
+            return
+
+        self.state = "SCHEDULED"
+        self.start_datetime = start_datetime
+        self.scheduled_run_timer = Timer(
+            seconds_until_start,
+            self._timeout,
+            args=[profile, run_trigger, startat],
+        )
+        self.scheduled_run_timer.start()
+        log.info(
+            "Scheduled to run the kiln at %s",
+            self.start_datetime,
+        )
+
+    def _timeout(self, profile, run_trigger, startat):
+        self.run_profile(profile, startat)
+        if run_trigger:
+            run_trigger()
 
     def abort_run(self):
         self.reset()
@@ -316,9 +301,17 @@ class Oven(threading.Thread):
                 log.info("kiln must catch up, too cold, shifting schedule")
                 self.start_time = datetime.datetime.now() - datetime.timedelta(milliseconds = self.runtime * 1000)
             # kiln too hot, wait for it to cool down
-            if temp - self.target > config.pid_control_window:
+            ### MODIFIED. I DON'T CARE ABOUT OVERSHOOTS EARLY ON IN THE FIRING CURVE, LIKE <100C
+            ### MY OVENS OVERSHOOT AS MUCH AS 10C AT LOW TEMPS IF TARGET TEMP IS MORE THAT A FEW DEGREES
+            ### ABOVE SENSOR TEMP AT START SO I WANT THE CURVE TO CONTINUE PROGRESSING ANYWAY. SET FIXED VALUE:
+            #if temp - self.target > config.pid_control_window:
+            if (temp >= config.ignore_pid_control_window_until) and (temp - self.target > config.pid_control_window):
                 log.info("kiln must catch up, too hot, shifting schedule")
-                self.start_time = datetime.datetime.now() - datetime.timedelta(milliseconds = self.runtime * 1000)
+                self.start_time = self.start_time + \
+                    datetime.timedelta(seconds=self.time_step)
+            # ADD ALTERNATE MESSAGING WHEN IGNORING CATCH-UP
+            elif (temp < config.ignore_pid_control_window_until) and (temp - self.target > config.pid_control_window):
+                log.info("over-swing detected, catch-up disabled, retaining schedule anyway while sensor temp is less than %s" % config.ignore_pid_control_window_until)
 
     def update_runtime(self):
 
@@ -336,22 +329,22 @@ class Oven(threading.Thread):
         if (self.board.temp_sensor.temperature + config.thermocouple_offset >=
             config.emergency_shutoff_temp):
             log.info("emergency!!! temperature too high")
-            if config.ignore_temp_too_high == False:
+            if not config.ignore_emergencies == True:
                 self.abort_run()
 
         if self.board.temp_sensor.noConnection:
             log.info("emergency!!! lost connection to thermocouple")
-            if config.ignore_lost_connection_tc == False:
+            if not config.ignore_emergencies == True:
                 self.abort_run()
 
         if self.board.temp_sensor.unknownError:
             log.info("emergency!!! unknown thermocouple error")
-            if config.ignore_unknown_tc_error == False:
+            if not config.ignore_emergencies == True:
                 self.abort_run()
 
         if self.board.temp_sensor.bad_percent > 30:
             log.info("emergency!!! too many errors in a short period")
-            if config.ignore_too_many_tc_errors == False:
+            if not config.ignore_emergencies == True:
                 self.abort_run()
 
     def reset_if_schedule_ended(self):
@@ -367,7 +360,11 @@ class Oven(threading.Thread):
             cost = 0
         self.cost = self.cost + cost
 
+
     def get_state(self):
+        scheduled_start = None
+        if self.start_datetime:
+            scheduled_start = self.start_datetime.strftime("%Y-%m-%d at %H:%M")
         temp = 0
         try:
             temp = self.board.temp_sensor.temperature + config.thermocouple_offset
@@ -388,6 +385,7 @@ class Oven(threading.Thread):
             'currency_type': config.currency_type,
             'profile': self.profile.name if self.profile else None,
             'pidstats': self.pid.pidstats,
+            'scheduled_start': scheduled_start,
         }
         return state
 
@@ -468,6 +466,8 @@ class Oven(threading.Thread):
 class SimulatedOven(Oven):
 
     def __init__(self):
+        # call parent init
+        super().__init__()
         self.board = BoardSimulated()
         self.t_env = config.sim_t_env
         self.c_heat = config.sim_c_heat
@@ -480,8 +480,6 @@ class SimulatedOven(Oven):
         # set temps to the temp of the surrounding environment
         self.t = self.t_env # deg C temp of oven
         self.t_h = self.t_env #deg C temp of heating element
-
-        super().__init__()
 
         # start thread
         self.start()
@@ -559,10 +557,10 @@ class RealOven(Oven):
     def __init__(self):
         self.board = Board()
         self.output = Output()
-        self.reset()
-
         # call parent init
         Oven.__init__(self)
+
+        self.reset()
 
         # start thread
         self.start()
@@ -581,7 +579,9 @@ class RealOven(Oven):
         # self.heat is for the front end to display if the heat is on
         self.heat = 0.0
         if heat_on > 0:
-            self.heat = 1.0
+            # WANT ACTUAL VALUE SENT TO PICOREFLOW.JS
+            #self.heat = 1.0
+            self.heat = heat_on
 
         if heat_on:
             self.output.heat(heat_on)
@@ -628,6 +628,26 @@ class Profile():
                 break
 
         return (prev_point, next_point)
+
+    ## findTemp - Returns the first time in the profile where the target temperature is
+    ## equal to the input temperature
+    def findTemp(self, temperature):
+        if temperature < self.data[0][1]:
+            return datetime.timedelta() #Start at the beginning
+        elif temperature > max([x for (t, x) in self.data]):
+            log.exception("Current temperature is higher than max profile point! Cannot resume.")
+            return None
+        else:
+            for index in range(1, len(self.data)):
+                if self.data[index][1] == temperature:
+                    return datetime.timedelta(seconds = self.data[index][0])
+                elif self.data[index][1] > temperature:
+                    slope = (self.data[index][0] - self.data[index-1][0]) / (self.data[index][1] - self.data[index-1][1])
+                    point = self.data[index-1][0] + slope * (temperature - self.data[index-1][1])
+                    return datetime.timedelta(seconds = point)
+                else:
+                    continue
+
 
     def get_target_temperature(self, time):
         if time > self.get_duration():
@@ -688,7 +708,7 @@ class PID():
             output = sorted([-1 * window_size, output, window_size])[1]
             out4logs = output
             output = float(output / window_size)
-            
+
         self.lastErr = error
         self.lastNow = now
 
@@ -714,3 +734,4 @@ class PID():
         }
 
         return output
+
