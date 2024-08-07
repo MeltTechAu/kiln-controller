@@ -19,13 +19,15 @@ Turns a Raspberry Pi into an Awesome, web-enabled kiln controller.
   * support for shifting schedule when kiln cannot heat quickly enough
   * prevents integral wind-up when temperatures not near the set point
   * automatic restarts if there is a power outage or other event
+
+  * software workks with Grounding to pi negative/ground to positive of thermocouple line makes it more accurate and stable MT 2024
   
-  2023 updates
-  * added Touch Fuction Edit/Stage Points MT
-  * added Talking kiln controller No connection for replacement of damaged part Audio notification with real voice MT
-  Added numerical order of profiles MT
+
+
+  Added numerical ordering of profiles MT 2024
   future
   Working on Cone Mode implementation
+  working on adaptive tuning
 **Run Kiln Schedule**
 
 ![Image](https://github.com/jbruce12000/kiln-controller/blob/master/public/assets/images/kiln-running.png)
