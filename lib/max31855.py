@@ -1,4 +1,4 @@
-#!/usr/bin/python
+dd#!/usr/bin/python
 import RPi.GPIO as GPIO
 import math
 
