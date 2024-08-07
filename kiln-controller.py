@@ -267,11 +267,17 @@ def handle_status():
             break
     log.info("websocket (status) closed")
 
+@app.get('/api/profiles')
 def get_profiles():
-    try:
-        profile_files = os.listdir(profile_path)
-    except:
-        profile_files = []
+    def extract_number(filename):
+        import re
+        match = re.search(r'\d+', filename)
+        return int(match.group()) if match else float('inf')
+
+    profile_files = sorted(
+        [f for f in os.listdir(profile_path) if os.path.isfile(os.path.join(profile_path, f))],
+        key=extract_number
+    )
     profiles = []
     for filename in profile_files:
         with open(os.path.join(profile_path, filename), 'r') as f:
