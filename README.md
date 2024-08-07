@@ -38,26 +38,12 @@ Turns a Raspberry Pi into an Awesome, web-enabled kiln controller.
 
 Download [Raspberry PI OS](https://www.raspberrypi.org/software/). Use Rasberry PI Imaging tool to install the OS on an SD card. Boot the OS, open a terminal and...
 
-    $ sudo apt-get update
-    $ sudo apt-get dist-upgrade
+
     $ sudo apt-get install python3-dev python3-virtualenv libevent-dev virtualenv
     $ git clone https://github.com/MeltTechAu/kiln-controller
     $ cd kiln-controller
-    $ virtualenv -p python3 venv
+    $ python3 -m venv venv
     $ source venv/bin/activate
-    $ export CFLAGS=-fcommon
-    $ pip3 install --upgrade setuptools
-    $ pip3 install greenlet bottle gevent gevent-websocket
-
-
-### Raspberry PI deployment
-
-If you're done playing around with simulations and want to deploy the code on a Raspberry PI to control a kiln, you'll need to do this in addition to the stuff listed above:
-
-    $ cd kiln-controller
-    $ virtualenv -p python3 venv
-    $ source venv/bin/activate
-    $ export CFLAGS=-fcommon
     $ pip3 install -r requirements.txt
 
 ## Configuration
