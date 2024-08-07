@@ -4,6 +4,7 @@ import os
 import sys
 import logging
 import json
+from datetime import datetime
 
 import bottle
 import gevent
@@ -17,11 +18,12 @@ try:
     sys.dont_write_bytecode = True
     import config
     sys.dont_write_bytecode = False
-except:
+except ImportError:
     print ("Could not import config file.")
     print ("Copy config.py.EXAMPLE to config.py and adapt it for your setup.")
     exit(1)
 
+# Ensure the config module is imported before using its attributes
 logging.basicConfig(level=config.log_level, format=config.log_format)
 log = logging.getLogger("kiln-controller")
 log.info("Starting kiln controller")
@@ -29,11 +31,21 @@ log.info("Starting kiln controller")
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, script_dir + '/lib/')
 profile_path = config.kiln_profiles_directory
-
 from oven import SimulatedOven, RealOven, Profile
 from ovenWatcher import OvenWatcher
 
 app = bottle.Bottle()
+
+# START BLINKING LED WHEN SERVICE IS RUNNING. REM OUT SECTION IF NOT DESIRED
+if config.service_running_led == True:
+    log.info("Starting GPIO service-running LED on GPIO " + str(config.service_running_led_gpio))
+    from gpiozero import Button, LEDBoard
+    from signal import pause
+    import warnings, os, sys
+    service_running_ledGPIO = config.service_running_led_gpio
+    service_running_led = LEDBoard(service_running_ledGPIO)
+    service_running_led.blink(on_time=1, off_time=1)
+# END - START BLINKING LED WHEN SERVICE IS RUNNING
 
 if config.simulate == True:
     log.info("this is a simulation")
@@ -56,12 +68,9 @@ def handle_api():
         if hasattr(oven.pid,'pidstats'):
             return json.dumps(oven.pid.pidstats)
 
-
 @app.post('/api')
 def handle_api():
     log.info("/api is alive")
-
-
     # run a kiln schedule
     if bottle.request.json['cmd'] == 'run':
         wanted = bottle.request.json['profile']
@@ -69,7 +78,7 @@ def handle_api():
 
         # start at a specific minute in the schedule
         # for restarting and skipping over early parts of a schedule
-        startat = 0;      
+        startat = 0
         if 'startat' in bottle.request.json:
             startat = bottle.request.json['startat']
 
@@ -81,8 +90,7 @@ def handle_api():
         # FIXME juggling of json should happen in the Profile class
         profile_json = json.dumps(profile)
         profile = Profile(profile_json)
-        oven.run_profile(profile,startat=startat)
-        ovenWatcher.record(profile)
+        run_profile(profile, startat=startat)
 
     if bottle.request.json['cmd'] == 'stop':
         log.info("api stop command received")
@@ -117,11 +125,14 @@ def find_profile(wanted):
             return profile
     return None
 
+def run_profile(profile, startat=0):
+    oven.run_profile(profile, startat)
+    ovenWatcher.record(profile)
+
 @app.route('/picoreflow/:filename#.*#')
 def send_static(filename):
     log.debug("serving %s" % filename)
     return bottle.static_file(filename, root=os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), "public"))
-
 
 def get_websocket_from_request():
     env = bottle.request.environ
@@ -129,7 +140,6 @@ def get_websocket_from_request():
     if not wsock:
         abort(400, 'Expected WebSocket request.')
     return wsock
-
 
 @app.route('/control')
 def handle_control():
@@ -147,27 +157,49 @@ def handle_control():
                     if profile_obj:
                         profile_json = json.dumps(profile_obj)
                         profile = Profile(profile_json)
-                    oven.run_profile(profile)
-                    ovenWatcher.record(profile)
+                    do_resume = msgdict.get('resume')
+                    oven.run_profile(profile, do_resume)
+
+                    run_profile(profile)
+
+                elif msgdict.get("cmd") == "SCHEDULED_RUN":
+                    log.info("SCHEDULED_RUN command received")
+                    scheduled_start_time = msgdict.get('scheduledStartTime')
+                    profile_obj = msgdict.get('profile')
+                    if profile_obj:
+                        profile_json = json.dumps(profile_obj)
+                        profile = Profile(profile_json)
+
+                    start_datetime = datetime.fromisoformat(
+                        scheduled_start_time,
+                    )
+                    oven.scheduled_run(
+                        start_datetime,
+                        profile,
+                        lambda: ovenWatcher.record(profile),
+                    )
+
                 elif msgdict.get("cmd") == "SIMULATE":
                     log.info("SIMULATE command received")
-                    #profile_obj = msgdict.get('profile')
-                    #if profile_obj:
-                    #    profile_json = json.dumps(profile_obj)
-                    #    profile = Profile(profile_json)
-                    #simulated_oven = Oven(simulate=True, time_step=0.05)
-                    #simulation_watcher = OvenWatcher(simulated_oven)
-                    #simulation_watcher.add_observer(wsock)
-                    #simulated_oven.run_profile(profile)
-                    #simulation_watcher.record(profile)
                 elif msgdict.get("cmd") == "STOP":
                     log.info("Stop command received")
                     oven.abort_run()
+                elif msgdict.get("cmd") == "BACKEND_FUNCTION_1":
+                    log.info("BACKEND_FUNCTION_1 command received")
+                elif msgdict.get("cmd") == "BACKEND_FUNCTION_2":
+                    log.info("BACKEND_FUNCTION_2 command received")
+                    if config.kiln_name == "Chematex":
+                       log.info("Switching to Rhode kiln")
+                       oven.abort_run()
+                       os.system ("/home/brett/mark_scripts/rhode &")
+                    else:
+                       log.info("Switching to Chematex kiln")
+                       oven.abort_run()
+                       os.system ("/home/brett/mark_scripts/chematex &")
         except WebSocketError as e:
             log.error(e)
             break
     log.info("websocket (control) closed")
-
 
 @app.route('/storage')
 def handle_storage():
@@ -194,26 +226,21 @@ def handle_storage():
                 if delete_profile(profile_obj):
                   msgdict["resp"] = "OK"
                 wsock.send(json.dumps(msgdict))
-                #wsock.send(get_profiles())
             elif msgdict.get("cmd") == "PUT":
                 log.info("PUT command received")
                 profile_obj = msgdict.get('profile')
-                #force = msgdict.get('force', False)
                 force = True
                 if profile_obj:
-                    #del msgdict["cmd"]
                     if save_profile(profile_obj, force):
                         msgdict["resp"] = "OK"
                     else:
                         msgdict["resp"] = "FAIL"
                     log.debug("websocket (storage) sent: %s" % message)
-
                     wsock.send(json.dumps(msgdict))
                     wsock.send(get_profiles())
         except WebSocketError:
             break
     log.info("websocket (storage) closed")
-
 
 @app.route('/config')
 def handle_config():
@@ -226,7 +253,6 @@ def handle_config():
         except WebSocketError:
             break
     log.info("websocket (config) closed")
-
 
 @app.route('/status')
 def handle_status():
@@ -241,7 +267,6 @@ def handle_status():
             break
     log.info("websocket (status) closed")
 
-
 def get_profiles():
     try:
         profile_files = os.listdir(profile_path)
@@ -252,7 +277,6 @@ def get_profiles():
         with open(os.path.join(profile_path, filename), 'r') as f:
             profiles.append(json.load(f))
     return json.dumps(profiles)
-
 
 def save_profile(profile, force=False):
     profile_json = json.dumps(profile)
@@ -275,24 +299,32 @@ def delete_profile(profile):
     log.info("Deleted %s" % filepath)
     return True
 
-
 def get_config():
     return json.dumps({"temp_scale": config.temp_scale,
         "time_scale_slope": config.time_scale_slope,
         "time_scale_profile": config.time_scale_profile,
         "kwh_rate": config.kwh_rate,
-        "currency_type": config.currency_type})    
-
+        "currency_type": config.currency_type,
+        "pid_kp": config.pid_kp,
+        "pid_ki": config.pid_ki,
+        "pid_kd": config.pid_kd,
+        "oven_kw": config.oven_kw,
+        "kiln_name": config.kiln_name,
+        "service_running_led_gpio": config.service_running_led_gpio,
+        "function_passcode": config.function_passcode,
+        "kiln_must_catch_up": config.kiln_must_catch_up,
+        "pid_control_window": config.pid_control_window,
+        "emergency_shutoff_temp": config.emergency_shutoff_temp,
+        "ignore_pid_control_window_until": config.ignore_pid_control_window_until})
 
 def main():
-    ip = "0.0.0.0"
+    ip = config.listening_ip
     port = config.listening_port
     log.info("listening on %s:%d" % (ip, port))
 
     server = WSGIServer((ip, port), app,
                         handler_class=WebSocketHandler)
     server.serve_forever()
-
 
 if __name__ == "__main__":
     main()
