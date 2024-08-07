@@ -11,10 +11,10 @@ var time_scale_slope = "s";
 var time_scale_profile = "s";
 var time_scale_long = "Seconds";
 var temp_scale_display = "C";
-var kwh_rate = 0.26;
-var currency_type = "EUR";
-
+var kwh_rate = 0.30;
+var currency_type = "AUS";
 var protocol = 'ws:';
+
 if (window.location.protocol == 'https:') {
     protocol = 'wss:';
 }
@@ -23,7 +23,8 @@ var ws_status = new WebSocket(host+"/status");
 var ws_control = new WebSocket(host+"/control");
 var ws_config = new WebSocket(host+"/config");
 var ws_storage = new WebSocket(host+"/storage");
-
+var oven_kw;
+var emergency_shutoff_temp;
 
 if(window.webkitRequestAnimationFrame) window.requestAnimationFrame = window.webkitRequestAnimationFrame;
 
@@ -51,7 +52,7 @@ function updateProfile(id)
     selected_profile = id;
     selected_profile_name = profiles[id].name;
     var job_seconds = profiles[id].data.length === 0 ? 0 : parseInt(profiles[id].data[profiles[id].data.length-1][0]);
-    var kwh = (3850*job_seconds/3600/1000).toFixed(2);
+    var kwh = (oven_kw*job_seconds/3600/1000).toFixed(2);
     var cost =  (kwh*kwh_rate).toFixed(2);
     var job_time = new Date(job_seconds * 1000).toISOString().substr(11, 8);
     $('#sel_prof').html(profiles[id].name);
@@ -78,7 +79,7 @@ function deleteProfile()
     $('#edit').hide();
     $('#profile_selector').show();
     $('#btn_controls').show();
-    $('#status').slideDown();
+    //$('#status').slideDown();
     $('#profile_table').slideUp();
     $('#e2').select2('val', 0);
     graph.profile.points.show = false;
@@ -188,24 +189,23 @@ function hazardTemp(){
     }
 }
 
-function timeTickFormatter(val,axis)
+function timeTickFormatter(val)
 {
-// hours
-if(axis.max>3600) {
-  //var hours = Math.floor(val / (3600));
-  //return hours;
-  return Math.floor(val/3600);
-  }
+    if (val < 1800)
+    {
+        return val;
+    }
+    else
+    {
+        var hours = Math.floor(val / (3600));
+        var div_min = val % (3600);
+        var minutes = Math.floor(div_min / 60);
 
-// minutes
-if(axis.max<=3600) {
-  return Math.floor(val/60);
-  }
+        if (hours   < 10) {hours   = "0"+hours;}
+        if (minutes < 10) {minutes = "0"+minutes;}
 
-// seconds
-if(axis.max<=60) {
-  return val;
-  }
+        return hours+":"+minutes;
+    }
 }
 
 function runTask()
@@ -213,7 +213,8 @@ function runTask()
     var cmd =
     {
         "cmd": "RUN",
-        "profile": profiles[selected_profile]
+        "profile": profiles[selected_profile],
+        "resume": 0
     }
 
     graph.live.data = [];
@@ -221,6 +222,40 @@ function runTask()
 
     ws_control.send(JSON.stringify(cmd));
 
+}
+
+function runTaskResume()
+{
+    var cmd =
+    {
+        "cmd": "RUN",
+        "profile": profiles[selected_profile],
+        "resume": 1
+    }
+
+    //    graph.live.data = [];
+graph.plot = $.plot("#graph_container", [ graph.profile, graph.live ] , getOptions());
+
+    ws_control.send(JSON.stringify(cmd));
+
+}
+
+function scheduleTask()
+{
+    const startTime = document.getElementById('scheduled-run-time').value;
+    console.log(startTime);
+
+    var cmd =
+    {
+        "cmd": "SCHEDULED_RUN",
+        "profile": profiles[selected_profile],
+        "scheduledStartTime": startTime,
+    }
+
+    graph.live.data = [];
+    graph.plot = $.plot("#graph_container", [ graph.profile, graph.live ] , getOptions());
+
+    ws_control.send(JSON.stringify(cmd));
 }
 
 function runTaskSimulation()
@@ -243,12 +278,13 @@ function abortTask()
 {
     var cmd = {"cmd": "STOP"};
     ws_control.send(JSON.stringify(cmd));
+
 }
 
 function enterNewMode()
 {
     state="EDIT"
-    $('#status').slideUp();
+    //$('#status').slideUp();
     $('#edit').show();
     $('#profile_selector').hide();
     $('#btn_controls').hide();
@@ -263,8 +299,9 @@ function enterNewMode()
 
 function enterEditMode()
 {
+    $("#nav_cancel").hide();
     state="EDIT"
-    $('#status').slideUp();
+    //$('#status').slideUp();
     $('#edit').show();
     $('#profile_selector').hide();
     $('#btn_controls').hide();
@@ -278,13 +315,14 @@ function enterEditMode()
 
 function leaveEditMode()
 {
+    $("#nav_cancel").hide();
     selected_profile_name = $('#form_profile_name').val();
     ws_storage.send('GET');
     state="IDLE";
     $('#edit').hide();
     $('#profile_selector').show();
     $('#btn_controls').show();
-    $('#status').slideDown();
+    //$('#status').slideDown();
     $('#profile_table').slideUp();
     graph.profile.points.show = false;
     graph.profile.draggable = false;
@@ -367,18 +405,6 @@ function saveProfile()
     leaveEditMode();
 }
 
-function get_tick_size() {
-//switch(time_scale_profile){
-//  case "s":
-//    return 1;
-//  case "m":
-//    return 60;
-//  case "h":
-//    return 3600;
-//  }
-return 3600;
-}
-
 function getOptions()
 {
 
@@ -408,7 +434,6 @@ function getOptions()
       min: 0,
       tickColor: 'rgba(216, 211, 197, 0.2)',
       tickFormatter: timeTickFormatter,
-      tickSize: get_tick_size(),
       font:
       {
         size: 14,
@@ -454,10 +479,37 @@ function getOptions()
 
 }
 
+function formatDateInput(date)
+{
+    var dd = date.getDate();
+    var mm = date.getMonth() + 1; //January is 0!
+    var yyyy = date.getFullYear();
+    var hh = date.getHours();
+    var mins = date.getMinutes();
 
+    if (dd < 10) {
+        dd = '0' + dd;
+    }
+
+    if (mm < 10) {
+        mm = '0' + mm;
+    }
+
+    const formattedDate = yyyy + '-' + mm + '-' + dd + 'T' + hh + ':' + mins;
+    return formattedDate;
+}
+
+function initDatetimePicker() {
+    const now = new Date();
+    const inThirtyMinutes = new Date();
+    inThirtyMinutes.setMinutes(inThirtyMinutes.getMinutes() + 10);
+    $('#scheduled-run-time').attr('value', formatDateInput(inThirtyMinutes));
+    $('#scheduled-run-time').attr('min', formatDateInput(now));
+}
 
 $(document).ready(function()
 {
+    initDatetimePicker();
 
     if(!("WebSocket" in window))
     {
@@ -473,17 +525,17 @@ $(document).ready(function()
         {
             console.log("Status Socket has been opened");
 
-//            $.bootstrapGrowl("<span class=\"glyphicon glyphicon-exclamation-sign\"></span>Getting data from server",
-//            {
-//            ele: 'body', // which element to append to
-//            type: 'success', // (null, 'info', 'error', 'success')
-//            offset: {from: 'top', amount: 250}, // 'top', or 'bottom'
-//            align: 'center', // ('left', 'right', or 'center')
-//            width: 385, // (integer, or 'auto')
-//            delay: 2500,
-//            allow_dismiss: true,
-//            stackup_spacing: 10 // spacing between consecutively stacked growls.
-//            });
+            $.bootstrapGrowl("<span class=\"glyphicon glyphicon-exclamation-sign\"></span> Getting data from server",
+            {
+            ele: 'body', // which element to append to
+            type: 'success', // (null, 'info', 'error', 'success')
+            offset: {from: 'top', amount: 250}, // 'top', or 'bottom'
+            align: 'center', // ('left', 'right', or 'center')
+            width: 385, // (integer, or 'auto')
+            delay: 2500,
+            allow_dismiss: true,
+            stackup_spacing: 10 // spacing between consecutively stacked growls.
+            });
         };
 
         ws_status.onclose = function()
@@ -535,7 +587,8 @@ $(document).ready(function()
                     {
                         $('#target_temp').html('---');
                         updateProgress(0);
-                        $.bootstrapGrowl("<span class=\"glyphicon glyphicon-exclamation-sign\"></span> <b>Run completed</b>", {
+                        canceltime = new Date().toLocaleTimeString();//.substr(11, 8);
+                        $.bootstrapGrowl("<span class=\"glyphicon glyphicon-exclamation-sign\"></span> <b>Run completed or aborted " + canceltime + "</b>", {
                         ele: 'body', // which element to append to
                         type: 'success', // (null, 'info', 'error', 'success')
                         offset: {from: 'top', amount: 250}, // 'top', or 'bottom'
@@ -545,13 +598,45 @@ $(document).ready(function()
                         allow_dismiss: true,
                         stackup_spacing: 10 // spacing between consecutively stacked growls.
                         });
+                        $("#nav_action").hide();
+                    }
+                    else if (state_last == "SCHEDULED")
+                    {
+                        $("#nav_cancel").hide();
+                        $('#target_temp').html('---');
+                        updateProgress(0);
+                        //canceltime = new Date().toLocaleTimeString();//.substr(11, 8);
+                        //$.bootstrapGrowl("<span class=\"glyphicon glyphicon-exclamation-sign\"></span> <b>Schedule transitioned or canceled " + canceltime + "</b>", {
+                        //ele: 'body', // which element to append to
+                        //type: 'info', // (null, 'info', 'error', 'success')
+                        //offset: {from: 'top', amount: 250}, // 'top', or 'bottom'
+                        //align: 'center', // ('left', 'right', or 'center')
+                        //width: 385, // (integer, or 'auto')
+                        //delay: 3000,
+                        //allow_dismiss: true,
+                        //stackup_spacing: 10 // spacing between consecutively stacked growls.
+                        //});
+                    }
+                    else
+                    {
+                        $("#nav_cancel").hide();
                     }
                 }
 
                 if(state=="RUNNING")
                 {
+                    $("#btn_delProfile").hide();
+                    $("#btn_newPoint").hide();
+                    $("#btn_delPoint").hide();
+                    $("#btn_new").hide();
+                    $("#allow_save_button").hide();
+                    $("#changes_locked").show();
+                    $("#nav_cancel").hide();
+                    $('#schedule-status').hide()
                     $("#nav_start").hide();
                     $("#nav_stop").show();
+                    $("#timer").removeClass("ds-led-timer-active");
+                    heat_now = (x.heat*7.143).toFixed(0); // This displays time percentage Heat is ON in heating cycle
 
                     graph.live.data.push([x.runtime, x.temperature]);
                     graph.plot = $.plot("#graph_container", [ graph.profile, graph.live ] , getOptions());
@@ -560,26 +645,73 @@ $(document).ready(function()
                     eta = new Date(left * 1000).toISOString().substr(11, 8);
 
                     updateProgress(parseFloat(x.runtime)/parseFloat(x.totaltime)*100);
-                    $('#state').html('<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span><span style="font-family: Digi; font-size: 40px;">' + eta + '</span>');
+                    $('#state').html('<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span><span style="font-family: Digi; font-size: 28px;">' + eta + ' </span><span class=ds-text-small>&#9832;&#xfe0e; ' + heat_now + '%</span>');
                     $('#target_temp').html(parseInt(x.target));
                     $('#cost').html(x.currency_type + parseFloat(x.cost).toFixed(2));
-                  
+                    $('#running').addClass("ds-led-heat-active");
+                    if (x.temperature > x.target)
+                       {
+                        $('#running').removeClass("ds-led-heat-active");
+                        $('#running').addClass("ds-led-cool-active");
 
+                       }
+                    $('#idle').removeClass("ds-led-hazard-active");
 
+                    if (heat_now > 99) {
+                    $('#state').html('<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span><span style="font-family: Digi; font-size: 28px;">' + eta + ' </span><span class=ds-text-small-red>&#9832;&#xfe0e; ' + heat_now + '%</span>');
+                      setTimeout(function() { $('#heat').addClass("ds-led-heat-active") }, 0 )
+                      setTimeout(function() { $('#heat').removeClass("ds-led-heat-active") }, (x.heat*1000.0)-5)
+                    }
+                    else if (heat_now > 0.0) {
+                      $('#state').html('<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span><span style="font-family: Digi; font-size: 28px;">' + eta + ' </span><span class=ds-text-small-yellow>&#9832;&#xfe0e; ' + heat_now + '%</span>');
+                      setTimeout(function() { $('#heat').addClass("ds-led-hazard-active") }, 0 )
+                      setTimeout(function() { $('#heat').removeClass("ds-led-hazard-active") }, (x.heat*1000.0)-5)
+                    }
+
+                }
+                else if (state === "SCHEDULED") {
+                    $("#btn_delProfile").hide();
+                    $("#btn_newPoint").hide();
+                    $("#btn_delPoint").hide();
+                    $("#btn_new").hide();
+                    $("#allow_save_button").hide();
+                    $("#changes_locked").show();
+                    $("#nav_start").hide();
+                    $("#nav_stop").hide();
+                    $("#nav_cancel").show();
+                    $('#timer').addClass("ds-led-timer-active"); // Start blinking timer symbol
+                    $('#state').html('<p class="ds-text">'+state+'<span class=ds-text-small-light-blue>for '+x.scheduled_start+'</span></p>');
                 }
                 else
                 {
+                    $("#btn_delProfile").show();
+                    $("#allow_save_button").show();
+                    $("#btn_newPoint").show();
+                    $("#btn_delPoint").show();
+                    $("#btn_new").show();
+                    $("#changes_locked").hide();
+                    $("#profile_selector").show();
                     $("#nav_start").show();
                     $("#nav_stop").hide();
+                    $("#nav_cancel").hide();
+                    $("#timer").removeClass("ds-led-timer-active");
                     $('#state').html('<p class="ds-text">'+state+'</p>');
-                }
-
+                    $('#schedule-status').hide()
+                    $('#idle').addClass("ds-led-hazard-active");     // IDLE
+                    $('#running').removeClass("ds-led-heat-active"); // RUNNING
+                    $('#running').removeClass("ds-led-cool-active"); // RUNNING
+		}
                 $('#act_temp').html(parseInt(x.temperature));
-                $('#heat').html('<div class="bar" style="height:'+x.pidstats.out*70+'%;"></div>')
-                if (x.cool > 0.5) { $('#cool').addClass("ds-led-cool-active"); } else { $('#cool').removeClass("ds-led-cool-active"); }
-                if (x.air > 0.5) { $('#air').addClass("ds-led-air-active"); } else { $('#air').removeClass("ds-led-air-active"); }
-                if (x.temperature > hazardTemp()) { $('#hazard').addClass("ds-led-hazard-active"); } else { $('#hazard').removeClass("ds-led-hazard-active"); }
-                if ((x.door == "OPEN") || (x.door == "UNKNOWN")) { $('#door').addClass("ds-led-door-open"); } else { $('#door').removeClass("ds-led-door-open"); }
+                //$('#progressBar').html('<div class="bar" style="height:'+x.pidstats.out*70+'%;"></div>')
+
+                if (x.temperature > warnat)
+                {
+                    $('#hazard').addClass("ds-led-heat-active");
+                }
+                else
+                {
+                    $('#hazard').removeClass("ds-led-hazard-active");
+                }
 
                 state_last = state;
 
@@ -601,8 +733,32 @@ $(document).ready(function()
             time_scale_slope = x.time_scale_slope;
             time_scale_profile = x.time_scale_profile;
             kwh_rate = x.kwh_rate;
+            oven_kw = x.oven_kw;
             currency_type = x.currency_type;
-
+            pid_kp = x.pid_kp;
+            pid_ki = x.pid_ki;
+            pid_kd = x.pid_kd;
+            function_passcode = x.function_passcode;
+            kiln_name = x.kiln_name;
+            emergency_shutoff_temp = x.emergency_shutoff_temp; // make variable emergency_shutoff_tempavailable here
+            warnat = emergency_shutoff_temp -5; // make variable emergency_shutoff_tempavailable here
+            kiln_must_catch_up = x.kiln_must_catch_up;
+            pid_control_window = x.pid_control_window;
+            ignore_pid_control_window_until = x.ignore_pid_control_window_until;
+            $("#pid_kp").html(pid_kp); // Define variable for web instance
+            $("#pid_ki").html(pid_ki); // Define variable for web instance
+            $("#pid_kd").html(pid_kd); // Define variable for web instance
+            $("#kiln_name").html(kiln_name); // Define variable for web instance
+            $("#emerg_temp").html(emergency_shutoff_temp); // Define variable for web instance
+            $("#warnat").html(warnat); // Define variable for web instance
+            if (kiln_must_catch_up == true)
+            {
+                $("#catch_up_max").html(pid_control_window + "\/" + ignore_pid_control_window_until); // Define variable for web instance
+            }
+            else
+            {
+                $("#catch_up_max").html("off"); // Define variable for web instance
+            }
             if (temp_scale == "c") {temp_scale_display = "C";} else {temp_scale_display = "F";}
 
 
